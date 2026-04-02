@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      width: 380px;
+      max-height: 520px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0a0e1a;
+      color: #e8e8e8;
+      overflow-y: auto;
+    }
+
+    /* Header */
+    .header {
+      background: linear-gradient(135deg, #1a237e 0%, #b71c1c 100%);
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .header-icon { font-size: 28px; }
+    .header h1 {
+      font-size: 15px;
+      font-weight: 700;
+      color: #fff;
+      line-height: 1.3;
+    }
+    .header p {
+      font-size: 11px;
+      color: rgba(255,255,255,0.7);
+      margin-top: 2px;
+    }
+
+    /* Controls */
+    .controls {
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #1e2438;
+    }
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .toggle-label { font-size: 13px; font-weight: 500; }
+
+    /* Toggle switch */
+    .switch {
+      position: relative;
+      width: 44px;
+      height: 24px;
+    }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      inset: 0;
+      background: #333;
+      border-radius: 24px;
+      transition: 0.3s;
+    }
+    .slider:before {
+      content: "";
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      left: 3px;
+      bottom: 3px;
+      background: #fff;
+      border-radius: 50%;
+      transition: 0.3s;
+    }
+    input:checked + .slider { background: #2e7d32; }
+    input:checked + .slider:before { transform: translateX(20px); }
+
+    .status {
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-weight: 600;
+    }
+    .status.on { background: #1b5e20; color: #66bb6a; }
+    .status.off { background: #4a1c1c; color: #ef9a9a; }
+
+    /* Interval control */
+    .interval-row {
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #1e2438;
+      font-size: 12px;
+      color: #aaa;
+    }
+    .interval-row select {
+      background: #1e2438;
+      color: #e8e8e8;
+      border: 1px solid #333;
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    /* Posts */
+    .section-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #666;
+      padding: 12px 16px 6px;
+    }
+    .post {
+      padding: 10px 16px;
+      border-bottom: 1px solid #1e2438;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .post:hover { background: #141929; }
+    .post-text {
+      font-size: 13px;
+      line-height: 1.5;
+      color: #d0d0d0;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .post-meta {
+      display: flex;
+      gap: 14px;
+      margin-top: 6px;
+      font-size: 11px;
+      color: #666;
+    }
+
+    .empty {
+      padding: 32px 16px;
+      text-align: center;
+      color: #555;
+      font-size: 13px;
+    }
+
+    /* Footer */
+    .footer {
+      padding: 10px 16px;
+      text-align: center;
+      font-size: 10px;
+      color: #444;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="header-icon">🔔</div>
+    <div>
+      <h1>Trump Truth Social Alert</h1>
+      <p>Real-time notifications for new posts</p>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="toggle-row">
+      <label class="switch">
+        <input type="checkbox" id="enableToggle" checked>
+        <span class="slider"></span>
+      </label>
+      <span class="toggle-label">Notifications</span>
+    </div>
+    <span class="status on" id="statusBadge">ACTIVE</span>
+  </div>
+
+  <div class="interval-row">
+    <span>Check every</span>
+    <select id="intervalSelect">
+      <option value="10">10 seconds</option>
+      <option value="30">30 seconds</option>
+      <option value="60">1 minute</option>
+      <option value="300">5 minutes</option>
+    </select>
+  </div>
+
+  <div class="section-title">Recent Truths</div>
+  <div id="postsList">
+    <div class="empty">Loading…</div>
+  </div>
+
+  <div class="footer">Powered by Truth Social's public API</div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
