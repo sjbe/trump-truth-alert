@@ -5,6 +5,10 @@ const statusBadge = document.getElementById("statusBadge");
 const intervalSelect = document.getElementById("intervalSelect");
 const postsList = document.getElementById("postsList");
 
+const TRUMP_ACCOUNT_ID = "107780257626128497";
+let allPosts = [];   // all posts loaded so far
+let loadingMore = false;
+
 // ── Load saved state ────────────────────────────────────────────────────────
 
 async function init() {
@@ -19,7 +23,8 @@ async function init() {
   intervalSelect.value = String(data.intervalSec || 10);
 
   // Posts
-  renderPosts(data.recentPosts || []);
+  allPosts = data.recentPosts || [];
+  renderPosts(allPosts);
 }
 
 // ── Toggle notifications on/off ─────────────────────────────────────────────
@@ -54,9 +59,43 @@ function renderPosts(posts) {
     .map((p) => {
       const timeAgo = getTimeAgo(new Date(p.created_at));
       const preview = p.text.length > 180 ? p.text.substring(0, 180) + "…" : p.text;
+
+      // Media grid helper
+      function mediaGrid(mediaArr) {
+        if (!mediaArr || !mediaArr.length) return "";
+        const thumbs = mediaArr.map((m) => {
+          const isVideo = m.type === "video" || m.type === "gifv";
+          return `<div class="media-thumb">
+            <img src="${escapeAttr(m.preview_url)}" loading="lazy" alt="">
+            ${isVideo ? `<div class="media-play">▶</div>` : ""}
+          </div>`;
+        }).join("");
+        return `<div class="media-grid">${thumbs}</div>`;
+      }
+
+      // Retruth footer
+      let rtFooter = "";
+      if (p.isRetruth && p.rtUrl) {
+        rtFooter = `<div class="rt-label">RT: <span class="rt-url">${escapeHtml(p.rtUrl)}</span></div>`;
+      }
+
+      // Reblog card (pure retruth with no comment)
+      let reblogCard = "";
+      if (p.reblogPreview) {
+        const rb = p.reblogPreview;
+        reblogCard = `<div class="reblog-card">
+          ${rb.account ? `<div class="reblog-account">${escapeHtml(rb.account)}</div>` : ""}
+          ${rb.text ? `<div class="reblog-text">${escapeHtml(rb.text)}</div>` : ""}
+          ${mediaGrid(rb.media)}
+        </div>`;
+      }
+
       return `
         <div class="post" data-url="${escapeAttr(p.url)}">
-          <div class="post-text">${escapeHtml(preview)}</div>
+          ${preview ? `<div class="post-text">${escapeHtml(preview)}</div>` : ""}
+          ${mediaGrid(p.media)}
+          ${reblogCard}
+          ${rtFooter}
           <div class="post-meta">
             <span>⏰ ${timeAgo}</span>
             <span>🔁 ${formatNum(p.reblogs_count)}</span>
@@ -73,6 +112,67 @@ function renderPosts(posts) {
       chrome.tabs.create({ url: el.dataset.url });
     });
   });
+
+  // Load more button
+  const oldestId = posts[posts.length - 1]?.id;
+  const btn = document.createElement("div");
+  btn.id = "loadMoreBtn";
+  btn.className = "load-more";
+  btn.textContent = "Load more";
+  btn.addEventListener("click", () => loadMore(oldestId));
+  postsList.appendChild(btn);
+}
+
+async function loadMore(maxId) {
+  if (loadingMore || !maxId) return;
+  loadingMore = true;
+
+  const btn = document.getElementById("loadMoreBtn");
+  if (btn) btn.textContent = "Loading…";
+
+  try {
+    const url = `https://truthsocial.com/api/v1/accounts/${TRUMP_ACCOUNT_ID}/statuses?exclude_replies=true&limit=10&max_id=${maxId}`;
+    const res = await fetch(url, { headers: { "Accept": "application/json" } });
+
+    if (!res.ok) throw new Error(`API ${res.status}`);
+
+    const raw = await res.json();
+    if (!Array.isArray(raw) || raw.length === 0) {
+      if (btn) { btn.textContent = "No more posts"; btn.style.opacity = "0.4"; btn.style.pointerEvents = "none"; }
+      return;
+    }
+
+    // Parse into same shape as saved posts
+    const newPosts = raw.map((p) => ({
+      id: p.id,
+      text: stripHtmlPopup(p.content || ""),
+      created_at: p.created_at,
+      url: p.url || `https://truthsocial.com/@realDonaldTrump/${p.id}`,
+      reblogs_count: p.reblogs_count || 0,
+      favourites_count: p.favourites_count || 0,
+      media: (p.media_attachments || []).map((m) => ({
+        type: m.type, preview_url: m.preview_url, url: m.url
+      }))
+    }));
+
+    allPosts = [...allPosts, ...newPosts];
+
+    // Remove old load-more button, re-render all
+    if (btn) btn.remove();
+    renderPosts(allPosts);
+  } catch (err) {
+    if (btn) { btn.textContent = "Error — try again"; btn.style.color = "#ef9a9a"; }
+    console.error("[TruthAlert popup] loadMore error:", err);
+  } finally {
+    loadingMore = false;
+  }
+}
+
+function stripHtmlPopup(html) {
+  return html
+    .replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, "")
+    .replace(/&amp;/g,"&").replace(/&lt;/g,"<").replace(/&gt;/g,">")
+    .replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&nbsp;/g," ").trim();
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

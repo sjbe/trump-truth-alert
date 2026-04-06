@@ -10,7 +10,7 @@ chrome.runtime.onInstalled.addListener(async () => {
   console.log("[TruthAlert] Installed/updated");
   const data = await chrome.storage.local.get(["enabled", "intervalSec"]);
   if (data.enabled === undefined) await chrome.storage.local.set({ enabled: true });
-  if (data.intervalSec === undefined) await chrome.storage.local.set({ intervalSec: 10 });
+  if (data.intervalSec === undefined) await chrome.storage.local.set({ intervalSec: 60 });
   await ensureOffscreen();
 });
 
@@ -82,22 +82,43 @@ chrome.storage.onChanged.addListener((changes, area) => {
 // ── Core: check for new posts ───────────────────────────────────────────────
 
 async function checkForNewPosts() {
-  const { enabled } = await chrome.storage.local.get("enabled");
+  const { enabled, rateLimitedUntil } = await chrome.storage.local.get(["enabled", "rateLimitedUntil"]);
   if (enabled === false) return;
+
+  // Respect rate limit cooldown
+  if (rateLimitedUntil && Date.now() < rateLimitedUntil) {
+    const secsLeft = Math.ceil((rateLimitedUntil - Date.now()) / 1000);
+    console.log(`[TruthAlert] Rate limited — ${secsLeft}s remaining, skipping`);
+    return;
+  }
 
   try {
     const response = await fetch(API_URL, {
-      headers: { "Accept": "application/json" }
+      headers: {
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Cache-Control": "no-cache",
+        "Pragma": "no-cache",
+        "Sec-Fetch-Dest": "empty",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Site": "same-origin"
+      }
     });
 
     if (!response.ok) {
       console.warn(`[TruthAlert] API ${response.status}`);
       chrome.action.setBadgeText({ text: "!" });
       chrome.action.setBadgeBackgroundColor({ color: "#b71c1c" });
+      if (response.status === 429) {
+        const cooldown = 5 * 60 * 1000; // 5 minutes
+        await chrome.storage.local.set({ rateLimitedUntil: Date.now() + cooldown });
+        console.warn("[TruthAlert] Rate limited — skipping checks for 5 minutes");
+      }
       return;
     }
 
     chrome.action.setBadgeText({ text: "" });
+    await chrome.storage.local.remove("rateLimitedUntil");
 
     const posts = await response.json();
     if (!Array.isArray(posts) || posts.length === 0) return;
@@ -187,13 +208,59 @@ function stripHtml(html) {
 }
 
 async function saveRecentPosts(posts) {
-  const recent = posts.slice(0, 10).map((p) => ({
-    id: p.id,
-    text: stripHtml(p.content || ""),
-    created_at: p.created_at,
-    url: p.url || `https://truthsocial.com/@realDonaldTrump/${p.id}`,
-    reblogs_count: p.reblogs_count || 0,
-    favourites_count: p.favourites_count || 0
-  }));
+  const recent = posts.slice(0, 10).map((p) => {
+    const media = (p.media_attachments || []).map((m) => ({
+      type: m.type,
+      preview_url: m.preview_url,
+      url: m.url
+    }));
+
+    // Parse retruth: HTML may have <p>RT:</p><p><a href="url">url</a></p><p>comment</p>
+    // Extract RT URL directly from HTML before stripping tags
+    const rtUrlFromHtml = (p.content || "").includes("RT:")
+      ? ((p.content || "").match(/href="(https?:\/\/[^"]+)"/)?.[1] || null)
+      : null;
+    // Strip HTML, converting <p>, </span>, and <br> to newlines for clean splitting
+    const rawText = stripHtml((p.content || "")
+      .replace(/<\/p>/gi, "\n")
+      .replace(/<\/span>/gi, "\n")
+      .replace(/<p[^>]*>/gi, "")
+    );
+    // Split into lines, filter out the "RT:" marker and the URL line itself
+    const lines = rawText.split("\n").map(l => l.trim()).filter(Boolean);
+    const isRtFormat = lines[0] === "RT:" || lines[0]?.startsWith("RT: http");
+    const isRetruth = isRtFormat || !!p.reblog;
+    const rtUrlFromLine = lines.find(l => l.startsWith("RT: http"))?.replace(/^RT:\s*/, "")
+      || lines.find(l => l.startsWith("http"));
+    const rtUrl = rtUrlFromHtml || (p.reblog?.url || null) || rtUrlFromLine;
+    // When hasReblog + content is just "RT @user..." attribution, treat as pure retruth (no comment)
+    const isReblogAttribution = !!p.reblog && !isRtFormat && lines[0]?.startsWith("RT ");
+    const commentLines = isRtFormat
+      ? lines.filter(l => l !== "RT:" && !l.startsWith("http") && !l.startsWith("RT: http"))
+      : isReblogAttribution ? [] : lines;
+    const comment = commentLines.join("\n").trim();
+
+    // For pure retruth (reblog field, no comment), grab reblog preview
+    const reblogPreview = p.reblog ? {
+      account: p.reblog.account?.display_name || p.reblog.account?.acct || "",
+      text: stripHtml(p.reblog.content || "").substring(0, 140),
+      media: (p.reblog.media_attachments || []).map((m) => ({
+        type: m.type, preview_url: m.preview_url, url: m.url
+      }))
+    } : null;
+
+    return {
+      id: p.id,
+      text: isRetruth ? comment : rawText,
+      created_at: p.created_at,
+      url: p.url || `https://truthsocial.com/@realDonaldTrump/${p.id}`,
+      reblogs_count: (p.reblog ? p.reblog.reblogs_count : p.reblogs_count) || 0,
+      favourites_count: (p.reblog ? p.reblog.favourites_count : p.favourites_count) || 0,
+      media,
+      isRetruth,
+      rtUrl,
+      reblogPreview
+    };
+  });
   await chrome.storage.local.set({ recentPosts: recent });
 }

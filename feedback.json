@@ -1,0 +1,35 @@
+{
+  "reviews": [
+    {
+      "run_id": "eval-1-tariffs-with_skill",
+      "feedback": "25 percent should be 25%. \n\nPresidential styling is wrong. Should be President Trump on first reference, Mr. Trump on subsequent. The \"Inconsistent presidential reference pattern\" should be an error, not a suggestion.\n\n\"The Secretary of Commerce\" is fine as a way to refer to Lutnick after first reference to avoid repeating his last name too many times, but it should be lowercased.",
+      "timestamp": "2026-04-03T19:28:26.457Z"
+    },
+    {
+      "run_id": "eval-1-tariffs-without_skill",
+      "feedback": "this one didn't catch all the styling errors, but i like the output format better, i think.",
+      "timestamp": "2026-04-03T19:28:26.457Z"
+    },
+    {
+      "run_id": "eval-2-wildfire-with_skill",
+      "feedback": "\"fifty thousand acres\" should be 50,000 acres. \"3 small towns\" should be three small towns. Governor Gavin Newsom should be Gov. Gavin Newsom. \"Governor Newsom\" on second reference should be \"Newsom.\"",
+      "timestamp": "2026-04-03T19:28:26.457Z"
+    },
+    {
+      "run_id": "eval-2-wildfire-without_skill",
+      "feedback": "i like this format but it did not identify all errors.",
+      "timestamp": "2026-04-03T19:28:26.457Z"
+    },
+    {
+      "run_id": "eval-3-infrastructure-with_skill",
+      "feedback": "did not catch use of en dash or oxford comma. \"The Speaker\" should be lowercase",
+      "timestamp": "2026-04-03T19:28:26.457Z"
+    },
+    {
+      "run_id": "eval-3-infrastructure-without_skill",
+      "feedback": "should lead with errors, not feedback",
+      "timestamp": "2026-04-03T19:28:26.457Z"
+    }
+  ],
+  "status": "complete"
+}
