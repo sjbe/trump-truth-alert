@@ -193,14 +193,22 @@
       object-fit: cover;
       display: block;
     }
-    .media-play {
+    .media-thumb { cursor: pointer; }
+    .media-play, .media-expand {
       position: absolute;
       inset: 0;
       display: flex;
       align-items: center;
       justify-content: center;
-      background: rgba(0,0,0,.45);
-      font-size: 24px;
+      background: rgba(0,0,0,0);
+      transition: background 0.15s;
+      font-size: 20px;
+      opacity: 0;
+    }
+    .media-thumb:hover .media-play,
+    .media-thumb:hover .media-expand {
+      background: rgba(0,0,0,0.45);
+      opacity: 1;
     }
 
     .rt-label {

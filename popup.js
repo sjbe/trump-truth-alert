@@ -65,9 +65,10 @@ function renderPosts(posts) {
         if (!mediaArr || !mediaArr.length) return "";
         const thumbs = mediaArr.map((m) => {
           const isVideo = m.type === "video" || m.type === "gifv";
-          return `<div class="media-thumb">
+          const fullUrl = m.url || m.preview_url;
+          return `<div class="media-thumb" data-fullurl="${escapeAttr(fullUrl)}">
             <img src="${escapeAttr(m.preview_url)}" loading="lazy" alt="">
-            ${isVideo ? `<div class="media-play">▶</div>` : ""}
+            ${isVideo ? `<div class="media-play">▶</div>` : `<div class="media-expand">⤢</div>`}
           </div>`;
         }).join("");
         return `<div class="media-grid">${thumbs}</div>`;
@@ -122,6 +123,14 @@ function renderPosts(posts) {
       `;
     })
     .join("");
+
+  // Media thumbnails — open full image in new tab
+  postsList.querySelectorAll(".media-thumb").forEach((thumb) => {
+    thumb.addEventListener("click", (e) => {
+      e.stopPropagation();
+      chrome.tabs.create({ url: thumb.dataset.fullurl });
+    });
+  });
 
   // Expand button
   postsList.querySelectorAll(".expand-btn").forEach((btn) => {
