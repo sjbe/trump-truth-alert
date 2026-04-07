@@ -143,20 +143,19 @@ async function sendNotification(post) {
 
   await chrome.storage.local.set({ [`notif_${notifId}`]: postUrl });
 
-  chrome.notifications.create(notifId, {
-    type: "basic",
-    iconUrl: chrome.runtime.getURL("icons/icon128.png"),
-    title: "New Truth from President Trump",
-    message: preview || "(media post)",
-    priority: 2,
-    requireInteraction: true
-  }, (createdId) => {
-    if (chrome.runtime.lastError) {
-      console.error("[TruthAlert] Notif error:", chrome.runtime.lastError.message);
-    } else {
-      console.log("[TruthAlert] Notified:", createdId);
-    }
-  });
+  try {
+    const createdId = await chrome.notifications.create(notifId, {
+      type: "basic",
+      iconUrl: chrome.runtime.getURL("icons/icon128.png"),
+      title: "New Truth from President Trump",
+      message: preview || "(media post)",
+      priority: 2,
+      requireInteraction: true
+    });
+    console.log("[TruthAlert] Notified:", createdId);
+  } catch (e) {
+    console.error("[TruthAlert] Notif error:", e.message);
+  }
 }
 
 chrome.notifications.onClicked.addListener(async (notifId) => {
