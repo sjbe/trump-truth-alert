@@ -169,6 +169,8 @@ function renderPosts(posts) {
   postsList.appendChild(btn);
 }
 
+const TRUMP_ACCOUNT_ID = "107780257626128497";
+
 async function loadMore(maxId) {
   if (loadingMore || !maxId) return;
   loadingMore = true;
@@ -177,11 +179,34 @@ async function loadMore(maxId) {
   if (btn) btn.textContent = "Loading…";
 
   try {
-    const res = await fetch(`https://trump-truth-server-production.up.railway.app/posts?limit=10&before=${maxId}`);
-    if (!res.ok) throw new Error(`API ${res.status}`);
+    let newPosts = null;
 
-    const newPosts = await res.json();
-    if (!Array.isArray(newPosts) || newPosts.length === 0) {
+    // Try server first
+    try {
+      const res = await fetch(`https://trump-truth-server-production.up.railway.app/posts?limit=10&before=${maxId}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length) newPosts = data;
+      }
+    } catch (e) { /* fall through */ }
+
+    // Fall back to Truth Social
+    if (!newPosts) {
+      const res = await fetch(`https://truthsocial.com/api/v1/accounts/${TRUMP_ACCOUNT_ID}/statuses?exclude_replies=true&limit=10&max_id=${maxId}`, { headers: { "Accept": "application/json" } });
+      if (!res.ok) throw new Error(`API ${res.status}`);
+      const raw = await res.json();
+      newPosts = raw.map(p => ({
+        id: p.id,
+        text: stripHtmlPopup(p.content || ""),
+        created_at: p.created_at,
+        url: p.url || `https://truthsocial.com/@realDonaldTrump/${p.id}`,
+        reblogs_count: p.reblogs_count || 0,
+        favourites_count: p.favourites_count || 0,
+        media: (p.media_attachments || []).map(m => ({ type: m.type, preview_url: m.preview_url, url: m.url }))
+      }));
+    }
+
+    if (!newPosts?.length) {
       if (btn) { btn.textContent = "No more posts"; btn.style.opacity = "0.4"; btn.style.pointerEvents = "none"; }
       return;
     }
@@ -195,6 +220,13 @@ async function loadMore(maxId) {
   } finally {
     loadingMore = false;
   }
+}
+
+function stripHtmlPopup(html) {
+  return html
+    .replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, "")
+    .replace(/&amp;/g,"&").replace(/&lt;/g,"<").replace(/&gt;/g,">")
+    .replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&nbsp;/g," ").trim();
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
