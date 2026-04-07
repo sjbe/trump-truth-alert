@@ -1,7 +1,7 @@
 // Trump Truth Social Alert - Background Service Worker
 // ALL logic runs here. The offscreen doc is just a keepalive timer.
 
-const API_URL = "https://trumptruthalerts.com/posts?limit=10";
+const API_URL = "https://trump-truth-server-production.up.railway.app/posts?limit=10";
 
 // ── Initialization ──────────────────────────────────────────────────────────
 

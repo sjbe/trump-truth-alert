@@ -177,7 +177,7 @@ async function loadMore(maxId) {
   if (btn) btn.textContent = "Loading…";
 
   try {
-    const res = await fetch(`https://trumptruthalerts.com/posts?limit=10&before=${maxId}`);
+    const res = await fetch(`https://trump-truth-server-production.up.railway.app/posts?limit=10&before=${maxId}`);
     if (!res.ok) throw new Error(`API ${res.status}`);
 
     const newPosts = await res.json();

@@ -11,7 +11,8 @@
   ],
   "host_permissions": [
     "https://truthsocial.com/*",
-    "https://trumptruthalerts.com/*"
+    "https://trumptruthalerts.com/*",
+    "https://trump-truth-server-production.up.railway.app/*"
   ],
   "background": {
     "service_worker": "background.js"
