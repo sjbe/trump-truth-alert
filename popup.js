@@ -79,11 +79,25 @@ function renderPosts(posts) {
         rtFooter = `<div class="rt-label">RT: <span class="rt-url">${escapeHtml(p.rtUrl)}</span></div>`;
       }
 
+      // Link preview card
+      let linkCard = "";
+      if (p.card && p.card.title) {
+        linkCard = `<div class="link-card" data-cardurl="${escapeAttr(p.card.url)}">
+          ${p.card.image ? `<img src="${escapeAttr(p.card.image)}" class="link-card-img" loading="lazy" alt="">` : ""}
+          <div class="link-card-body">
+            ${p.card.provider ? `<div class="link-card-provider">${escapeHtml(p.card.provider)}</div>` : ""}
+            <div class="link-card-title">${escapeHtml(p.card.title)}</div>
+            ${p.card.description ? `<div class="link-card-desc">${escapeHtml(p.card.description)}</div>` : ""}
+          </div>
+        </div>`;
+      }
+
       // Reblog card (pure retruth with no comment)
       let reblogCard = "";
       if (p.reblogPreview) {
         const rb = p.reblogPreview;
         reblogCard = `<div class="reblog-card">
+          <div class="reblog-label">🔁 Retruth</div>
           ${rb.account ? `<div class="reblog-account">${escapeHtml(rb.account)}</div>` : ""}
           ${rb.text ? `<div class="reblog-text">${escapeHtml(rb.text)}</div>` : ""}
           ${mediaGrid(rb.media)}
@@ -94,6 +108,7 @@ function renderPosts(posts) {
         <div class="post" data-url="${escapeAttr(p.url)}">
           ${preview ? `<div class="post-text">${escapeHtml(preview)}</div>` : ""}
           ${mediaGrid(p.media)}
+          ${linkCard}
           ${reblogCard}
           ${rtFooter}
           <div class="post-meta">
@@ -108,8 +123,13 @@ function renderPosts(posts) {
 
   // Click to open
   postsList.querySelectorAll(".post").forEach((el) => {
-    el.addEventListener("click", () => {
-      chrome.tabs.create({ url: el.dataset.url });
+    el.addEventListener("click", (e) => {
+      const card = e.target.closest(".link-card");
+      if (card) {
+        chrome.tabs.create({ url: card.dataset.cardurl });
+      } else {
+        chrome.tabs.create({ url: el.dataset.url });
+      }
     });
   });
 
