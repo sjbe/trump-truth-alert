@@ -10,7 +10,8 @@
     "offscreen"
   ],
   "host_permissions": [
-    "https://truthsocial.com/*"
+    "https://truthsocial.com/*",
+    "https://trumptruthalerts.com/*"
   ],
   "background": {
     "service_worker": "background.js"
