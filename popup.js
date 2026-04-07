@@ -5,7 +5,6 @@ const statusBadge = document.getElementById("statusBadge");
 const intervalSelect = document.getElementById("intervalSelect");
 const postsList = document.getElementById("postsList");
 
-const TRUMP_ACCOUNT_ID = "107780257626128497";
 let allPosts = [];   // all posts loaded so far
 let loadingMore = false;
 
@@ -58,7 +57,8 @@ function renderPosts(posts) {
   postsList.innerHTML = posts
     .map((p) => {
       const timeAgo = getTimeAgo(new Date(p.created_at));
-      const preview = p.text.length > 180 ? p.text.substring(0, 180) + "…" : p.text;
+      const isLong = p.text && p.text.length > 300;
+      const preview = isLong ? p.text.substring(0, 300) + "…" : p.text;
 
       // Media grid helper
       function mediaGrid(mediaArr) {
@@ -107,6 +107,8 @@ function renderPosts(posts) {
       return `
         <div class="post" data-url="${escapeAttr(p.url)}">
           ${preview ? `<div class="post-text">${escapeHtml(preview)}</div>` : ""}
+          ${isLong ? `<div class="full-text" style="display:none">${escapeHtml(p.text)}</div>
+          <div class="expand-btn">See full post ▾</div>` : ""}
           ${mediaGrid(p.media)}
           ${linkCard}
           ${reblogCard}
@@ -121,9 +123,24 @@ function renderPosts(posts) {
     })
     .join("");
 
+  // Expand button
+  postsList.querySelectorAll(".expand-btn").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const post = btn.closest(".post");
+      const preview = post.querySelector(".post-text");
+      const full = post.querySelector(".full-text");
+      const expanded = full.style.display !== "none";
+      preview.style.display = expanded ? "" : "none";
+      full.style.display = expanded ? "none" : "";
+      btn.textContent = expanded ? "See full post ▾" : "Show less ▴";
+    });
+  });
+
   // Click to open
   postsList.querySelectorAll(".post").forEach((el) => {
     el.addEventListener("click", (e) => {
+      if (e.target.closest(".expand-btn")) return;
       const card = e.target.closest(".link-card");
       if (card) {
         chrome.tabs.create({ url: card.dataset.cardurl });
@@ -151,33 +168,16 @@ async function loadMore(maxId) {
   if (btn) btn.textContent = "Loading…";
 
   try {
-    const url = `https://truthsocial.com/api/v1/accounts/${TRUMP_ACCOUNT_ID}/statuses?exclude_replies=true&limit=10&max_id=${maxId}`;
-    const res = await fetch(url, { headers: { "Accept": "application/json" } });
-
+    const res = await fetch(`https://trumptruthalerts.com/posts?limit=10&before=${maxId}`);
     if (!res.ok) throw new Error(`API ${res.status}`);
 
-    const raw = await res.json();
-    if (!Array.isArray(raw) || raw.length === 0) {
+    const newPosts = await res.json();
+    if (!Array.isArray(newPosts) || newPosts.length === 0) {
       if (btn) { btn.textContent = "No more posts"; btn.style.opacity = "0.4"; btn.style.pointerEvents = "none"; }
       return;
     }
 
-    // Parse into same shape as saved posts
-    const newPosts = raw.map((p) => ({
-      id: p.id,
-      text: stripHtmlPopup(p.content || ""),
-      created_at: p.created_at,
-      url: p.url || `https://truthsocial.com/@realDonaldTrump/${p.id}`,
-      reblogs_count: p.reblogs_count || 0,
-      favourites_count: p.favourites_count || 0,
-      media: (p.media_attachments || []).map((m) => ({
-        type: m.type, preview_url: m.preview_url, url: m.url
-      }))
-    }));
-
     allPosts = [...allPosts, ...newPosts];
-
-    // Remove old load-more button, re-render all
     if (btn) btn.remove();
     renderPosts(allPosts);
   } catch (err) {
@@ -186,13 +186,6 @@ async function loadMore(maxId) {
   } finally {
     loadingMore = false;
   }
-}
-
-function stripHtmlPopup(html) {
-  return html
-    .replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, "")
-    .replace(/&amp;/g,"&").replace(/&lt;/g,"<").replace(/&gt;/g,">")
-    .replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&nbsp;/g," ").trim();
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
