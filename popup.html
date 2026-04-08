@@ -111,27 +111,6 @@
     .status.on { background: #0f2e1a; color: #4ade80; border: 1px solid #166534; }
     .status.off { background: #2a1111; color: #f87171; border: 1px solid #7f1d1d; }
 
-    /* Interval control */
-    .interval-row {
-      padding: 9px 16px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      border-bottom: 1px solid #1e1e1e;
-      font-size: 11px;
-      color: #666;
-      background: #161616;
-    }
-    .interval-row select {
-      background: #1e1e1e;
-      color: #aaa;
-      border: 1px solid #2a2a2a;
-      border-radius: 4px;
-      padding: 3px 8px;
-      font-size: 11px;
-      cursor: pointer;
-      outline: none;
-    }
 
     /* Posts */
     .section-title {
@@ -354,15 +333,6 @@
       <span class="toggle-label">Notifications</span>
     </div>
     <span class="status on" id="statusBadge">Active</span>
-  </div>
-
-  <div class="interval-row">
-    <span>Check every</span>
-    <select id="intervalSelect">
-      <option value="60">1 minute</option>
-      <option value="120">2 minutes</option>
-      <option value="300">5 minutes</option>
-    </select>
   </div>
 
   <div class="section-title">Recent Truths</div>

@@ -2,7 +2,6 @@
 
 const enableToggle = document.getElementById("enableToggle");
 const statusBadge = document.getElementById("statusBadge");
-const intervalSelect = document.getElementById("intervalSelect");
 const postsList = document.getElementById("postsList");
 
 let allPosts = [];   // all posts loaded so far
@@ -17,9 +16,6 @@ async function init() {
   const isEnabled = data.enabled !== false;
   enableToggle.checked = isEnabled;
   updateStatusBadge(isEnabled);
-
-  // Interval
-  intervalSelect.value = String(data.intervalSec || 10);
 
   // Posts
   allPosts = data.recentPosts || [];
@@ -38,13 +34,6 @@ function updateStatusBadge(on) {
   statusBadge.textContent = on ? "ACTIVE" : "PAUSED";
   statusBadge.className = on ? "status on" : "status off";
 }
-
-// ── Interval selector ───────────────────────────────────────────────────────
-
-intervalSelect.addEventListener("change", async () => {
-  const sec = parseInt(intervalSelect.value, 10);
-  await chrome.storage.local.set({ intervalSec: sec });
-});
 
 // ── Render recent posts ─────────────────────────────────────────────────────
 
