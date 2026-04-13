@@ -46,7 +46,17 @@ function renderPosts(posts) {
   postsList.innerHTML = posts
     .map((p) => {
       const timeAgo = getTimeAgo(new Date(p.created_at));
-      const displayText = p.card ? (p.text || "").replace(/[\s:]*https?:\/\/[\s\S]*$/, "").trim() : p.text;
+      const displayText = (() => {
+        if (!p.card) return p.text;
+        const text = p.text || "";
+        const idx = text.lastIndexOf("https://");
+        if (idx === -1) return text;
+        const before = text.substring(0, idx).replace(/[\s:]+$/, "").trim();
+        // Only strip if what comes before the URL is at least 80% of the real content,
+        // i.e. the URL is near the end — not embedded mid-sentence
+        if (before.length >= text.length * 0.5) return before;
+        return text;
+      })();
       const isLong = displayText && displayText.length > 300;
       const preview = isLong ? displayText.substring(0, 300) + "…" : displayText;
 
