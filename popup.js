@@ -111,6 +111,7 @@ function renderPosts(posts) {
           ${reblogCard}
           ${rtFooter}
           <div class="post-meta">
+            ${p.deleted ? `<span class="deleted-badge">DELETED</span>` : ""}
             <span>⏰ ${timeAgo}</span>
             <span>🔁 ${formatNum(p.reblogs_count)}</span>
             <span>❤️ ${formatNum(p.favourites_count)}</span>
