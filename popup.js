@@ -46,7 +46,7 @@ function renderPosts(posts) {
   postsList.innerHTML = posts
     .map((p) => {
       const timeAgo = getTimeAgo(new Date(p.created_at));
-      const displayText = p.card ? (p.text || "").replace(/[\s:]*https?:\/\/\S+/g, "").trim() : p.text;
+      const displayText = p.card ? (p.text || "").replace(/[\s:]*https?:\/\/[\s\S]*$/, "").trim() : p.text;
       const isLong = displayText && displayText.length > 300;
       const preview = isLong ? displayText.substring(0, 300) + "…" : displayText;
 
