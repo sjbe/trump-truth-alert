@@ -46,8 +46,9 @@ function renderPosts(posts) {
   postsList.innerHTML = posts
     .map((p) => {
       const timeAgo = getTimeAgo(new Date(p.created_at));
-      const isLong = p.text && p.text.length > 300;
-      const preview = isLong ? p.text.substring(0, 300) + "…" : p.text;
+      const displayText = p.card ? (p.text || "").replace(/[\s:]*https?:\/\/\S+/g, "").trim() : p.text;
+      const isLong = displayText && displayText.length > 300;
+      const preview = isLong ? displayText.substring(0, 300) + "…" : displayText;
 
       // Media grid helper
       function mediaGrid(mediaArr) {
@@ -97,7 +98,7 @@ function renderPosts(posts) {
       return `
         <div class="post" data-url="${escapeAttr(p.url)}">
           ${preview ? `<div class="post-text">${escapeHtml(preview)}</div>` : ""}
-          ${isLong ? `<div class="full-text" style="display:none">${escapeHtml(p.text)}</div>
+          ${isLong ? `<div class="full-text" style="display:none">${escapeHtml(displayText)}</div>
           <div class="expand-btn">See full post ▾</div>` : ""}
           ${mediaGrid(p.media)}
           ${linkCard}
@@ -117,7 +118,8 @@ function renderPosts(posts) {
   postsList.querySelectorAll(".media-thumb").forEach((thumb) => {
     thumb.addEventListener("click", (e) => {
       e.stopPropagation();
-      chrome.tabs.create({ url: thumb.dataset.fullurl });
+      const url = thumb.dataset.fullurl;
+      if (isSafeUrl(url)) chrome.tabs.create({ url });
     });
   });
 
@@ -140,11 +142,8 @@ function renderPosts(posts) {
     el.addEventListener("click", (e) => {
       if (e.target.closest(".expand-btn")) return;
       const card = e.target.closest(".link-card");
-      if (card) {
-        chrome.tabs.create({ url: card.dataset.cardurl });
-      } else {
-        chrome.tabs.create({ url: el.dataset.url });
-      }
+      const url = card ? card.dataset.cardurl : el.dataset.url;
+      if (isSafeUrl(url)) chrome.tabs.create({ url });
     });
   });
 
@@ -184,15 +183,26 @@ async function loadMore(maxId) {
       const res = await fetch(`https://truthsocial.com/api/v1/accounts/${TRUMP_ACCOUNT_ID}/statuses?exclude_replies=true&limit=10&max_id=${maxId}`, { headers: { "Accept": "application/json" } });
       if (!res.ok) throw new Error(`API ${res.status}`);
       const raw = await res.json();
-      newPosts = raw.map(p => ({
-        id: p.id,
-        text: stripHtmlPopup(p.content || ""),
-        created_at: p.created_at,
-        url: p.url || `https://truthsocial.com/@realDonaldTrump/${p.id}`,
-        reblogs_count: p.reblogs_count || 0,
-        favourites_count: p.favourites_count || 0,
-        media: (p.media_attachments || []).map(m => ({ type: m.type, preview_url: m.preview_url, url: m.url }))
-      }));
+      newPosts = raw.map(p => {
+        const rawCard = p.card || null;
+        const card = rawCard && rawCard.title ? {
+          url: rawCard.url,
+          title: rawCard.title,
+          description: rawCard.description,
+          image: rawCard.image,
+          provider: rawCard.provider_name || (() => { try { return new URL(rawCard.url).hostname; } catch { return ""; } })()
+        } : null;
+        return {
+          id: p.id,
+          text: stripHtmlPopup(p.content || ""),
+          created_at: p.created_at,
+          url: p.url || `https://truthsocial.com/@realDonaldTrump/${p.id}`,
+          reblogs_count: p.reblogs_count || 0,
+          favourites_count: p.favourites_count || 0,
+          media: (p.media_attachments || []).map(m => ({ type: m.type, preview_url: m.preview_url, url: m.url })),
+          card
+        };
+      });
     }
 
     if (!newPosts?.length) {
@@ -262,8 +272,80 @@ function escapeHtml(str) {
 }
 
 function escapeAttr(str) {
-  return str.replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  return str.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/'/g, "&#39;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function isSafeUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "https:" || parsed.protocol === "http:";
+  } catch {
+    return false;
+  }
+}
+
+// ── Email signup ─────────────────────────────────────────────────────────────
+
+const SERVER = "https://trump-truth-server-production.up.railway.app";
+
+async function initEmailSignup() {
+  const { emailSubscribed, emailDismissed } = await chrome.storage.local.get(["emailSubscribed", "emailDismissed"]);
+  if (emailSubscribed || emailDismissed) {
+    document.getElementById("emailSignup").style.display = "none";
+    return;
+  }
+
+  const input = document.getElementById("emailInput");
+  const btn = document.getElementById("emailSubmit");
+  const msg = document.getElementById("emailMsg");
+
+  document.getElementById("emailDismiss").addEventListener("click", async () => {
+    await chrome.storage.local.set({ emailDismissed: true });
+    document.getElementById("emailSignup").style.display = "none";
+  });
+
+  btn.addEventListener("click", async () => {
+    const email = input.value.trim();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      msg.textContent = "Please enter a valid email address.";
+      msg.className = "email-msg error";
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = "Subscribing…";
+    msg.className = "email-msg";
+
+    try {
+      const res = await fetch(`${SERVER}/subscribe`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, source: "extension" }),
+      });
+      const data = await res.json();
+      if (res.ok && data.status === "ok") {
+        await chrome.storage.local.set({ emailSubscribed: true });
+        msg.textContent = "You're subscribed! Check your inbox for a welcome email.";
+        msg.className = "email-msg success";
+        input.style.display = "none";
+        btn.style.display = "none";
+      } else {
+        throw new Error(data.error || `Server error ${res.status}`);
+      }
+    } catch (err) {
+      msg.textContent = "Signup failed — please try again.";
+      msg.className = "email-msg error";
+      btn.disabled = false;
+      btn.textContent = "Subscribe";
+      console.error("[TruthAlert] subscribe error:", err);
+    }
+  });
+
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") btn.click();
+  });
 }
 
 // ── Go ──────────────────────────────────────────────────────────────────────
 init();
+initEmailSignup();
