@@ -111,7 +111,8 @@ function renderPosts(posts) {
         if (hasText || !p.media?.length) return "";
         const hasVideo = p.media.some(m => m.type === "video" || m.type === "gifv");
         if (hasVideo) return `<span class="media-badge">🎬 VIDEO</span>`;
-        return `<span class="media-badge">📷 IMAGE</span>`;
+        const description = p.media.find(m => m.description)?.description;
+        return `<span class="media-badge">📷 IMAGE${description ? ` — ${escapeHtml(description)}` : ""}</span>`;
       })();
 
       return `
