@@ -126,12 +126,12 @@ function renderPosts(posts) {
     })
     .join("");
 
-  // Media thumbnails — open full image in new tab
+  // Media thumbnails — open the post on Truth Social
   postsList.querySelectorAll(".media-thumb").forEach((thumb) => {
     thumb.addEventListener("click", (e) => {
       e.stopPropagation();
-      const url = thumb.dataset.fullurl;
-      if (isSafeUrl(url)) chrome.tabs.create({ url });
+      const url = thumb.closest(".post")?.dataset.url;
+      if (url && isSafeUrl(url)) chrome.tabs.create({ url });
     });
   });
 
