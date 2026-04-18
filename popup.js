@@ -62,6 +62,11 @@ function renderPosts(posts) {
         const thumbs = mediaArr.map((m) => {
           const isVideo = m.type === "video" || m.type === "gifv";
           const fullUrl = m.url || m.preview_url;
+          if (isVideo && !m.preview_url) {
+            return `<div class="media-thumb media-thumb--no-preview" data-fullurl="${escapeAttr(fullUrl)}">
+              <div class="media-play-placeholder">▶</div>
+            </div>`;
+          }
           return `<div class="media-thumb" data-fullurl="${escapeAttr(fullUrl)}">
             <img src="${escapeAttr(m.preview_url)}" loading="lazy" alt="">
             ${isVideo ? `<div class="media-play">▶</div>` : `<div class="media-expand">⤢</div>`}
