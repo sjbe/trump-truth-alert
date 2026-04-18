@@ -106,11 +106,20 @@ function renderPosts(posts) {
         </div>`;
       }
 
+      const hasText = !!displayText;
+      const mediaLabel = (() => {
+        if (hasText || !p.media?.length) return "";
+        const hasVideo = p.media.some(m => m.type === "video" || m.type === "gifv");
+        if (hasVideo) return `<span class="media-badge">🎬 VIDEO</span>`;
+        return `<span class="media-badge">📷 IMAGE</span>`;
+      })();
+
       return `
         <div class="post" data-url="${escapeAttr(p.url)}">
           ${preview ? `<div class="post-text">${escapeHtml(preview)}</div>` : ""}
           ${isLong ? `<div class="full-text" style="display:none">${escapeHtml(displayText)}</div>
           <div class="expand-btn">See full post ▾</div>` : ""}
+          ${mediaLabel}
           ${mediaGrid(p.media)}
           ${linkCard}
           ${reblogCard}
