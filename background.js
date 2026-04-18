@@ -1,13 +1,11 @@
 // Trump Truth Social Alert - Background Service Worker
 // ALL logic runs here. The offscreen doc is just a keepalive timer.
 
-const SERVER_URL = "https://trump-truth-server-production.up.railway.app/posts?limit=10";
-const TRUMP_ACCOUNT_ID = "107780257626128497";
-const TRUTH_SOCIAL_URL = `https://truthsocial.com/api/v1/accounts/${TRUMP_ACCOUNT_ID}/statuses?exclude_replies=true&limit=10`;
+const RAILWAY_URL = "https://trump-truth-server-production.up.railway.app/posts?limit=10";
 
 // ── Initialization ──────────────────────────────────────────────────────────
 
-chrome.runtime.onInstalled.addListener(async () => {
+chrome.runtime.onInstalled.addListener(async (details) => {
   console.log("[TruthAlert] Installed/updated");
   const data = await chrome.storage.local.get(["enabled", "intervalSec"]);
   if (data.enabled === undefined) await chrome.storage.local.set({ enabled: true });
@@ -25,8 +23,23 @@ chrome.alarms.create("ensureAlive", { periodInMinutes: 0.5 });
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name === "ensureAlive") {
     await ensureOffscreen();
+    await cleanupStaleNotifKeys();
   }
 });
+
+async function cleanupStaleNotifKeys() {
+  const all = await chrome.storage.local.get(null);
+  const staleKeys = Object.keys(all).filter((k) => k.startsWith("notif_truth-"));
+  if (staleKeys.length > 50) {
+    const sorted = staleKeys.sort((a, b) => {
+      const idA = a.replace("notif_truth-", "");
+      const idB = b.replace("notif_truth-", "");
+      try { return Number(BigInt(idB) - BigInt(idA)); } catch { return idB.localeCompare(idA); }
+    });
+    const toRemove = sorted.slice(10);
+    if (toRemove.length) await chrome.storage.local.remove(toRemove);
+  }
+}
 
 // ── Offscreen document management ───────────────────────────────────────────
 
@@ -52,12 +65,10 @@ chrome.runtime.onConnect.addListener((port) => {
   if (port.name === "keepalive") {
     console.log("[TruthAlert] Offscreen connected");
 
-    // Tell it to start ticking
     chrome.storage.local.get("intervalSec").then(({ intervalSec }) => {
       port.postMessage({ type: "startTimer", seconds: intervalSec || 10 });
     });
 
-    // Each tick = time to check for new posts
     port.onMessage.addListener((msg) => {
       if (msg.type === "tick") {
         checkForNewPosts();
@@ -69,8 +80,6 @@ chrome.runtime.onConnect.addListener((port) => {
 // Forward setting changes to offscreen
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== "local") return;
-  // We can't easily message the offscreen doc directly in this architecture,
-  // so if interval changes, just recreate the offscreen doc
   if (changes.intervalSec || changes.enabled) {
     chrome.offscreen.hasDocument().then((exists) => {
       if (exists) {
@@ -82,68 +91,48 @@ chrome.storage.onChanged.addListener((changes, area) => {
 
 // ── Core: check for new posts ───────────────────────────────────────────────
 
-async function fetchPosts() {
-  // Try our server first (no rate limiting), fall back to Truth Social
-  try {
-    const res = await fetch(SERVER_URL);
-    if (res.ok) {
-      const posts = await res.json();
-      if (Array.isArray(posts) && posts.length) return { posts, source: "server" };
-    }
-  } catch (e) {
-    console.warn("[TruthAlert] Server unreachable, falling back to Truth Social");
-  }
-
-  // Fallback: Truth Social directly
-  const res = await fetch(TRUTH_SOCIAL_URL, {
-    headers: { "Accept": "application/json" }
-  });
-  if (!res.ok) throw new Error(`Truth Social API ${res.status}`);
-  return { posts: await res.json(), source: "truthsocial" };
-}
-
 async function checkForNewPosts() {
   const { enabled } = await chrome.storage.local.get("enabled");
   if (enabled === false) return;
 
   try {
-    const { posts, source } = await fetchPosts();
-    console.log(`[TruthAlert] Fetched from ${source}`);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
 
-    chrome.action.setBadgeText({ text: "" });
+    let response;
+    try {
+      response = await fetch(RAILWAY_URL, { signal: controller.signal });
+    } finally {
+      clearTimeout(timeout);
+    }
 
-    // Normalize Truth Social posts to server format if needed
-    const normalized = source === "server" ? posts : posts.map(p => ({
-      id: p.id,
-      text: stripHtml((p.content || "").replace(/<\/p>/gi, "\n").replace(/<p[^>]*>/gi, "")).trim(),
-      created_at: p.created_at,
-      url: p.url || `https://truthsocial.com/@realDonaldTrump/${p.id}`,
-      reblogs_count: p.reblogs_count || 0,
-      favourites_count: p.favourites_count || 0,
-      media: (p.media_attachments || []).map(m => ({ type: m.type, preview_url: m.preview_url, url: m.url })),
-      isRetruth: !!p.reblog,
-      rtUrl: p.reblog?.url || null,
-      reblogPreview: p.reblog ? {
-        account: p.reblog.account?.display_name || "",
-        text: stripHtml(p.reblog.content || "").substring(0, 140),
-        media: (p.reblog.media_attachments || []).map(m => ({ type: m.type, preview_url: m.preview_url, url: m.url }))
-      } : null,
-      card: p.card ? { url: p.card.url, title: p.card.title, description: p.card.description, image: p.card.image, provider: p.card.provider_name || "" } : null
-    }));
-
-    if (!normalized.length) return;
-
-    const { lastSeenId } = await chrome.storage.local.get("lastSeenId");
-
-    // First run — save baseline, no notification
-    if (!lastSeenId) {
-      console.log("[TruthAlert] Baseline set:", normalized[0].id);
-      await chrome.storage.local.set({ lastSeenId: normalized[0].id });
-      await saveRecentPosts(normalized);
+    if (!response.ok) {
+      console.warn(`[TruthAlert] Railway ${response.status} — skipping tick`);
       return;
     }
 
-    const newPosts = normalized.filter((p) => {
+    const contentType = response.headers.get("content-type") || "";
+    if (!contentType.includes("application/json")) {
+      console.warn(`[TruthAlert] Railway returned non-JSON (${contentType}) — skipping tick`);
+      return;
+    }
+
+    const posts = await response.json();
+    if (!Array.isArray(posts) || posts.length === 0) return;
+
+    const latestTime = posts[0]?.created_at ? new Date(posts[0].created_at).toLocaleTimeString() : "unknown";
+    console.log(`[TruthAlert] Checked ${new Date().toLocaleTimeString()} — latest post: ${latestTime}`);
+    chrome.action.setBadgeText({ text: "" });
+
+    const { lastSeenId } = await chrome.storage.local.get("lastSeenId");
+
+    if (!lastSeenId) {
+      console.log("[TruthAlert] Baseline set:", posts[0].id);
+      await chrome.storage.local.set({ lastSeenId: posts[0].id, recentPosts: posts.slice(0, 10) });
+      return;
+    }
+
+    const newPosts = posts.filter((p) => {
       try { return BigInt(p.id) > BigInt(lastSeenId); }
       catch { return p.id > lastSeenId; }
     });
@@ -161,11 +150,13 @@ async function checkForNewPosts() {
       setTimeout(() => chrome.action.setBadgeText({ text: "" }), 5000);
     }
 
-    await saveRecentPosts(normalized);
+    await chrome.storage.local.set({ recentPosts: posts.slice(0, 10) });
   } catch (err) {
-    console.warn("[TruthAlert] Check failed:", err.message);
-    chrome.action.setBadgeText({ text: "!" });
-    chrome.action.setBadgeBackgroundColor({ color: "#b71c1c" });
+    if (err.name === "AbortError") {
+      console.warn("[TruthAlert] Railway fetch timed out — skipping tick");
+    } else {
+      console.warn("[TruthAlert] Error:", err.message);
+    }
   }
 }
 
@@ -173,7 +164,8 @@ async function checkForNewPosts() {
 
 async function sendNotification(post) {
   const text = post.text || "";
-  const preview = text.length > 200 ? text.substring(0, 200) + "…" : text;
+  const mediaDescription = !text && post.media?.find(m => m.description)?.description;
+  const preview = text.length > 200 ? text.substring(0, 200) + "…" : text || (mediaDescription ? `📷 ${mediaDescription}` : "(media post)");
   const notifId = `truth-${post.id}`;
   const postUrl = post.url || `https://truthsocial.com/@realDonaldTrump/${post.id}`;
 
@@ -184,13 +176,13 @@ async function sendNotification(post) {
       type: "basic",
       iconUrl: chrome.runtime.getURL("icons/icon128.png"),
       title: "New Truth from President Trump",
-      message: preview || "(media post)",
+      message: preview,
       priority: 2,
       requireInteraction: true
     });
     console.log("[TruthAlert] Notified:", createdId);
   } catch (e) {
-    console.error("[TruthAlert] Notif error:", e.message);
+    console.warn("[TruthAlert] Notif error:", e.message);
   }
 }
 
@@ -198,22 +190,20 @@ chrome.notifications.onClicked.addListener(async (notifId) => {
   const key = `notif_${notifId}`;
   const data = await chrome.storage.local.get(key);
   const url = data[key] || "https://truthsocial.com/@realDonaldTrump";
-  chrome.tabs.create({ url });
+  if (isSafeUrl(url)) {
+    chrome.tabs.create({ url });
+  }
   chrome.notifications.clear(notifId);
   await chrome.storage.local.remove(key);
 });
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function stripHtml(html) {
-  return html
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<[^>]+>/g, "")
-    .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, " ")
-    .trim();
-}
-
-async function saveRecentPosts(posts) {
-  await chrome.storage.local.set({ recentPosts: posts.slice(0, 10) });
+function isSafeUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "https:" || parsed.protocol === "http:";
+  } catch {
+    return false;
+  }
 }
