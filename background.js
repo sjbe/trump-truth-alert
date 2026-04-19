@@ -164,8 +164,11 @@ async function checkForNewPosts() {
 
 async function sendNotification(post) {
   const text = post.text || "";
-  const mediaDescription = !text && post.media?.find(m => m.description)?.description;
-  const preview = text.length > 200 ? text.substring(0, 200) + "…" : text || (mediaDescription ? `📷 ${mediaDescription}` : "(media post)");
+  const mediaWithDesc = !text && post.media?.find(m => m.description);
+  const mediaDescription = mediaWithDesc?.description;
+  const hasVideo = !text && post.media?.some(m => m.type === "video");
+  const mediaEmoji = mediaWithDesc?.type === "video" ? "🎬" : "📷";
+  const preview = text.length > 200 ? text.substring(0, 200) + "…" : text || (mediaDescription ? `${mediaEmoji} ${mediaDescription}` : hasVideo ? "🎬 New video post" : "(media post)");
   const notifId = `truth-${post.id}`;
   const postUrl = post.url || `https://truthsocial.com/@realDonaldTrump/${post.id}`;
 
