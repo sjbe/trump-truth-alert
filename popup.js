@@ -136,11 +136,13 @@ function renderPosts(posts) {
     })
     .join("");
 
-  // Media thumbnails — open the post on Truth Social
+  // Media thumbnails — open the post on Truth Social (or the asset directly if deleted)
   postsList.querySelectorAll(".media-thumb").forEach((thumb) => {
     thumb.addEventListener("click", (e) => {
       e.stopPropagation();
-      const url = thumb.closest(".post")?.dataset.url;
+      const post = thumb.closest(".post");
+      const isDeleted = !!post?.querySelector(".deleted-badge");
+      const url = isDeleted ? thumb.dataset.fullurl : post?.dataset.url;
       if (url && isSafeUrl(url)) chrome.tabs.create({ url });
     });
   });
