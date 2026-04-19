@@ -110,8 +110,8 @@ function renderPosts(posts) {
       const mediaLabel = (() => {
         if (hasText || !p.media?.length) return "";
         const hasVideo = p.media.some(m => m.type === "video" || m.type === "gifv");
-        if (hasVideo) return `<span class="media-badge">🎬 VIDEO</span>`;
         const description = p.media.find(m => m.description)?.description;
+        if (hasVideo) return `<span class="media-badge">🎬 VIDEO${description ? ` — ${escapeHtml(description)}` : ""}</span>`;
         return `<span class="media-badge">📷 IMAGE${description ? ` — ${escapeHtml(description)}` : ""}</span>`;
       })();
 
