@@ -7,6 +7,41 @@ const postsList = document.getElementById("postsList");
 let allPosts = [];   // all posts loaded so far
 let loadingMore = false;
 
+const ALL_TYPES = ["text", "link", "image", "video", "retruth"];
+let activeFilters = new Set(ALL_TYPES);
+
+function getDisplayText(p) {
+  if (!p.card) return p.text;
+  const text = p.text || "";
+  const idx = text.lastIndexOf("https://");
+  if (idx === -1) return text;
+  return text.substring(0, idx).replace(/[\s:]+$/, "").trim();
+}
+
+function getPostType(p) {
+  const displayText = getDisplayText(p);
+  const hasVideo = p.media?.some(m => m.type === "video" || m.type === "gifv");
+  const hasMedia = !!p.media?.length;
+  if ((p.isRetruth || p.reblogPreview) && !displayText && hasMedia) return hasVideo ? "video" : "image";
+  if (p.isRetruth || p.reblogPreview) return "retruth";
+  if (!displayText && hasVideo) return "video";
+  if (!displayText && hasMedia) return "image";
+  if (p.card?.title) return "link";
+  return "text";
+}
+
+function getTypeBadgeHtml(type, p) {
+  const description = p.media?.find(m => m.description)?.description;
+  const desc = description ? ` — ${escapeHtml(description)}` : "";
+  switch (type) {
+    case "link":    return `<span class="media-badge badge--link">🔗 LINK</span>`;
+    case "image":   return `<span class="media-badge badge--image">📷 IMAGE${desc}</span>`;
+    case "video":   return `<span class="media-badge badge--video">🎬 VIDEO${desc}</span>`;
+    case "retruth": return `<span class="media-badge badge--retruth">🔁 RETRUTH</span>`;
+    default:        return `<span class="media-badge">📝 TEXT</span>`;
+  }
+}
+
 // ── Load saved state ────────────────────────────────────────────────────────
 
 async function init() {
@@ -38,21 +73,21 @@ function updateStatusBadge(on) {
 // ── Render recent posts ─────────────────────────────────────────────────────
 
 function renderPosts(posts) {
+  const filtered = posts.filter(p => activeFilters.has(getPostType(p)));
+
   if (!posts.length) {
     postsList.innerHTML = `<div class="empty">No posts loaded yet.<br>They'll appear after the first check.</div>`;
     return;
   }
+  if (!filtered.length) {
+    postsList.innerHTML = `<div class="empty">No posts match the selected filters.</div>`;
+    return;
+  }
 
-  postsList.innerHTML = posts
+  postsList.innerHTML = filtered
     .map((p) => {
       const timeAgo = getTimeAgo(new Date(p.created_at));
-      const displayText = (() => {
-        if (!p.card) return p.text;
-        const text = p.text || "";
-        const idx = text.lastIndexOf("https://");
-        if (idx === -1) return text;
-        return text.substring(0, idx).replace(/[\s:]+$/, "").trim();
-      })();
+      const displayText = getDisplayText(p);
       const isLong = displayText && displayText.length > 300;
       const preview = isLong ? displayText.substring(0, 300) + "…" : displayText;
 
@@ -106,21 +141,14 @@ function renderPosts(posts) {
         </div>`;
       }
 
-      const hasText = !!displayText;
-      const mediaLabel = (() => {
-        if (hasText || !p.media?.length) return "";
-        const hasVideo = p.media.some(m => m.type === "video" || m.type === "gifv");
-        const description = p.media.find(m => m.description)?.description;
-        if (hasVideo) return `<span class="media-badge">🎬 VIDEO${description ? ` — ${escapeHtml(description)}` : ""}</span>`;
-        return `<span class="media-badge">📷 IMAGE${description ? ` — ${escapeHtml(description)}` : ""}</span>`;
-      })();
+      const postTypeBadge = getTypeBadgeHtml(getPostType(p), p);
 
       return `
         <div class="post" data-url="${escapeAttr(p.url)}">
-          ${preview ? `<div class="post-text">${escapeHtml(preview)}</div>` : ""}
-          ${isLong ? `<div class="full-text" style="display:none">${escapeHtml(displayText)}</div>
+          ${postTypeBadge}
+          ${preview ? `<div class="post-text">${linkify(escapeHtml(preview))}</div>` : ""}
+          ${isLong ? `<div class="full-text" style="display:none">${linkify(escapeHtml(displayText))}</div>
           <div class="expand-btn">See full post ▾</div>` : ""}
-          ${mediaLabel}
           ${mediaGrid(p.media)}
           ${linkCard}
           ${reblogCard}
@@ -165,8 +193,9 @@ function renderPosts(posts) {
   postsList.querySelectorAll(".post").forEach((el) => {
     el.addEventListener("click", (e) => {
       if (e.target.closest(".expand-btn")) return;
+      const inlineLink = e.target.closest("a[href]");
       const card = e.target.closest(".link-card");
-      const url = card ? card.dataset.cardurl : el.dataset.url;
+      const url = inlineLink ? inlineLink.href : card ? card.dataset.cardurl : el.dataset.url;
       if (isSafeUrl(url)) chrome.tabs.create({ url });
     });
   });
@@ -181,9 +210,8 @@ function renderPosts(posts) {
   postsList.appendChild(btn);
 }
 
-const TRUMP_ACCOUNT_ID = "107780257626128497";
-
-async function loadMore(maxId) {
+async function loadMore(maxId, autoFetchCount = 0, filteredSoFar = 0) {
+  const MAX_AUTO_FETCH = 10;
   if (loadingMore || !maxId) return;
   loadingMore = true;
 
@@ -193,40 +221,10 @@ async function loadMore(maxId) {
   try {
     let newPosts = null;
 
-    // Try server first
-    try {
-      const res = await fetch(`https://trump-truth-server-production.up.railway.app/posts?limit=10&before=${maxId}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data) && data.length) newPosts = data;
-      }
-    } catch (e) { /* fall through */ }
-
-    // Fall back to Truth Social
-    if (!newPosts) {
-      const res = await fetch(`https://truthsocial.com/api/v1/accounts/${TRUMP_ACCOUNT_ID}/statuses?exclude_replies=true&limit=10&max_id=${maxId}`, { headers: { "Accept": "application/json" } });
-      if (!res.ok) throw new Error(`API ${res.status}`);
-      const raw = await res.json();
-      newPosts = raw.map(p => {
-        const rawCard = p.card || null;
-        const card = rawCard && rawCard.title ? {
-          url: rawCard.url,
-          title: rawCard.title,
-          description: rawCard.description,
-          image: rawCard.image,
-          provider: rawCard.provider_name || (() => { try { return new URL(rawCard.url).hostname; } catch { return ""; } })()
-        } : null;
-        return {
-          id: p.id,
-          text: stripHtmlPopup(p.content || ""),
-          created_at: p.created_at,
-          url: p.url || `https://truthsocial.com/@realDonaldTrump/${p.id}`,
-          reblogs_count: p.reblogs_count || 0,
-          favourites_count: p.favourites_count || 0,
-          media: (p.media_attachments || []).map(m => ({ type: m.type, preview_url: m.preview_url, url: m.url })),
-          card
-        };
-      });
+    const res = await fetch(`https://trump-truth-server-production.up.railway.app/posts?limit=10&before=${maxId}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length) newPosts = data;
     }
 
     if (!newPosts?.length) {
@@ -235,6 +233,15 @@ async function loadMore(maxId) {
     }
 
     allPosts = [...allPosts, ...newPosts];
+
+    const newFiltered = newPosts.filter(p => activeFilters.has(getPostType(p)));
+    const totalFiltered = filteredSoFar + newFiltered.length;
+    if (totalFiltered < 10 && newPosts.length === 10 && autoFetchCount < MAX_AUTO_FETCH) {
+      const nextId = allPosts[allPosts.length - 1]?.id;
+      loadingMore = false;
+      if (nextId) { await loadMore(nextId, autoFetchCount + 1, totalFiltered); return; }
+    }
+
     if (btn) btn.remove();
     renderPosts(allPosts);
   } catch (err) {
@@ -245,12 +252,6 @@ async function loadMore(maxId) {
   }
 }
 
-function stripHtmlPopup(html) {
-  return html
-    .replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, "")
-    .replace(/&amp;/g,"&").replace(/&lt;/g,"<").replace(/&gt;/g,">")
-    .replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&nbsp;/g," ").trim();
-}
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -293,6 +294,10 @@ function escapeHtml(str) {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+function linkify(escapedHtml) {
+  return escapedHtml.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1">$1</a>');
 }
 
 function escapeAttr(str) {
@@ -369,6 +374,40 @@ async function initEmailSignup() {
     if (e.key === "Enter") btn.click();
   });
 }
+
+// ── Filter pills ─────────────────────────────────────────────────────────────
+
+document.getElementById("filterBar").addEventListener("click", (e) => {
+  const pill = e.target.closest(".filter-pill");
+  if (!pill) return;
+  const type = pill.dataset.type;
+  const pills = document.querySelectorAll(".filter-pill");
+
+  if (activeFilters.size === ALL_TYPES.length) {
+    // All active — isolate to just this type
+    activeFilters = new Set([type]);
+    pills.forEach(p => p.classList.toggle("inactive", p.dataset.type !== type));
+  } else if (activeFilters.has(type)) {
+    activeFilters.delete(type);
+    if (activeFilters.size === 0) {
+      // Last one turned off — snap back to all
+      activeFilters = new Set(ALL_TYPES);
+      pills.forEach(p => p.classList.remove("inactive"));
+    } else {
+      pill.classList.add("inactive");
+    }
+  } else {
+    activeFilters.add(type);
+    pill.classList.remove("inactive");
+  }
+  renderPosts(allPosts);
+
+  const currentFiltered = allPosts.filter(p => activeFilters.has(getPostType(p)));
+  if (currentFiltered.length < 10 && allPosts.length >= 10) {
+    const oldestId = allPosts[allPosts.length - 1]?.id;
+    if (oldestId) loadMore(oldestId, 0, currentFiltered.length);
+  }
+});
 
 // ── Go ──────────────────────────────────────────────────────────────────────
 init();
