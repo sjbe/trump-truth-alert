@@ -26,7 +26,7 @@ function getPostType(p) {
   if (p.isRetruth || p.reblogPreview) return "retruth";
   if (!displayText && hasVideo) return "video";
   if (!displayText && hasMedia) return "image";
-  if (p.card?.title) return "link";
+  if (p.card?.title || /https?:\/\//.test(p.text || "")) return "link";
   return "text";
 }
 
