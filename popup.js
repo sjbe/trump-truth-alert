@@ -297,7 +297,11 @@ function escapeHtml(str) {
 }
 
 function linkify(escapedHtml) {
-  return escapedHtml.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1">$1</a>');
+  return escapedHtml.replace(/(https?:\/\/[^\s<]+)/g, (url) => {
+    const display = url.replace(/^https?:\/\/(www\.)?/, "");
+    const label = display.length > 50 ? display.substring(0, 50) + "…" : display;
+    return `<a href="${url}">${label}</a>`;
+  });
 }
 
 function escapeAttr(str) {
