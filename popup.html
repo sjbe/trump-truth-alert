@@ -114,6 +114,34 @@
     .status.off { background: #2a1111; color: #f87171; border: 1px solid #7f1d1d; }
 
 
+    /* Filter bar */
+    .filter-bar {
+      display: flex;
+      gap: 5px;
+      padding: 8px 16px;
+      border-bottom: 1px solid #1e1e1e;
+      background: #161616;
+      flex-wrap: wrap;
+    }
+    .filter-pill {
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      border-radius: 3px;
+      padding: 3px 7px;
+      cursor: pointer;
+      border: 1px solid #333;
+      background: #1e1e1e;
+      color: #aaa;
+      transition: opacity 0.15s;
+    }
+    .filter-pill:hover { opacity: 0.8; }
+    .filter-pill.inactive { opacity: 0.25; }
+    .filter-pill--link    { color: #7cb3f0; border-color: #3a5a80; }
+    .filter-pill--image   { color: #f0b97c; border-color: #80562a; }
+    .filter-pill--video   { color: #f07c7c; border-color: #802a2a; }
+    .filter-pill--retruth { color: #7cf0a8; border-color: #2a8050; }
+
     /* Posts */
     .section-title {
       font-size: 10px;
@@ -140,6 +168,8 @@
       font-size: 13px;
       line-height: 1.5;
       color: #ddd;
+      overflow-wrap: break-word;
+      word-break: break-word;
     }
     .post-meta {
       display: flex;
@@ -161,6 +191,10 @@
       padding: 2px 6px;
       margin-bottom: 6px;
     }
+    .badge--link    { color: #7cb3f0; border-color: #3a5a80; }
+    .badge--image   { color: #f0b97c; border-color: #80562a; }
+    .badge--video   { color: #f07c7c; border-color: #802a2a; }
+    .badge--retruth { color: #7cf0a8; border-color: #2a8050; }
     .deleted-badge {
       font-size: 9px;
       font-weight: 800;
@@ -437,6 +471,14 @@
       <span class="toggle-label">Notifications</span>
     </div>
     <span class="status on" id="statusBadge">Active</span>
+  </div>
+
+  <div class="filter-bar" id="filterBar">
+    <button class="filter-pill" data-type="text">📝 TEXT</button>
+    <button class="filter-pill filter-pill--link" data-type="link">🔗 LINK</button>
+    <button class="filter-pill filter-pill--image" data-type="image">📷 IMAGE</button>
+    <button class="filter-pill filter-pill--video" data-type="video">🎬 VIDEO</button>
+    <button class="filter-pill filter-pill--retruth" data-type="retruth">🔁 RETRUTH</button>
   </div>
 
   <div class="email-signup" id="emailSignup">
