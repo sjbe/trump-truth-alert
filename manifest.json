@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Trump Truth Social Alert",
-  "version": "1.3.1",
+  "version": "1.4.4",
   "description": "Get instant browser notifications when President Trump posts on Truth Social.",
   "permissions": [
     "alarms",
@@ -10,7 +10,6 @@
     "offscreen"
   ],
   "host_permissions": [
-    "https://truthsocial.com/*",
     "https://trump-truth-server-production.up.railway.app/*"
   ],
   "background": {

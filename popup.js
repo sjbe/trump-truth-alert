@@ -103,7 +103,7 @@ function renderPosts(posts) {
             </div>`;
           }
           return `<div class="media-thumb" data-fullurl="${escapeAttr(fullUrl)}">
-            <img src="${escapeAttr(m.preview_url)}" loading="lazy" alt="">
+            <img src="${escapeAttr(unwrapProxyUrl(m.preview_url))}" loading="lazy" alt="">
             ${isVideo ? `<div class="media-play">▶</div>` : `<div class="media-expand">⤢</div>`}
           </div>`;
         }).join("");
@@ -221,7 +221,7 @@ async function loadMore(maxId, autoFetchCount = 0, filteredSoFar = 0) {
   try {
     let newPosts = null;
 
-    const res = await fetch(`https://trump-truth-server-production.up.railway.app/posts?limit=10&before=${maxId}`);
+    const res = await fetch(`https://trump-truth-server-production.up.railway.app/posts?limit=10&before=${maxId}`, { headers: { "X-TTA-Client": "ext" } });
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data) && data.length) newPosts = data;
@@ -308,6 +308,19 @@ function escapeAttr(str) {
   return str.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/'/g, "&#39;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+// If a URL is an old Railway image-proxy wrapper, unwrap it to the direct CDN URL
+function unwrapProxyUrl(url) {
+  if (!url) return url;
+  try {
+    const u = new URL(url);
+    if (u.hostname === "trump-truth-server-production.up.railway.app" && u.pathname === "/image-proxy") {
+      const inner = u.searchParams.get("url");
+      if (inner) return inner;
+    }
+  } catch {}
+  return url;
+}
+
 function isSafeUrl(url) {
   try {
     const parsed = new URL(url);
@@ -352,7 +365,7 @@ async function initEmailSignup() {
     try {
       const res = await fetch(`${SERVER}/subscribe`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "X-TTA-Client": "ext" },
         body: JSON.stringify({ email, source: "extension" }),
       });
       const data = await res.json();

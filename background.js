@@ -101,7 +101,7 @@ async function checkForNewPosts() {
 
     let response;
     try {
-      response = await fetch(RAILWAY_URL, { signal: controller.signal });
+      response = await fetch(RAILWAY_URL, { signal: controller.signal, headers: { "X-TTA-Client": "ext" } });
     } finally {
       clearTimeout(timeout);
     }
@@ -168,7 +168,7 @@ async function sendNotification(post) {
   const mediaDescription = mediaWithDesc?.description;
   const hasVideo = !text && post.media?.some(m => m.type === "video");
   const mediaEmoji = mediaWithDesc?.type === "video" ? "🎬" : "📷";
-  const preview = text.length > 200 ? text.substring(0, 200) + "…" : text || (mediaDescription ? `${mediaEmoji} ${mediaDescription}` : hasVideo ? "🎬 New video post" : "(media post)");
+  const preview = text.length > 200 ? text.substring(0, 200) + "…" : text || (mediaDescription ? `${mediaEmoji} ${mediaDescription}` : hasVideo ? "🎬 New video post" : "📷 New image post");
   const notifId = `truth-${post.id}`;
   const postUrl = post.url || `https://truthsocial.com/@realDonaldTrump/${post.id}`;
 
