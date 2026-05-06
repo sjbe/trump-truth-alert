@@ -7,9 +7,11 @@ const RAILWAY_URL = "https://trump-truth-server-production.up.railway.app/posts?
 
 chrome.runtime.onInstalled.addListener(async (details) => {
   console.log("[TruthAlert] Installed/updated");
-  const data = await chrome.storage.local.get(["enabled", "intervalSec"]);
+  const data = await chrome.storage.local.get(["enabled"]);
   if (data.enabled === undefined) await chrome.storage.local.set({ enabled: true });
-  if (data.intervalSec === undefined) await chrome.storage.local.set({ intervalSec: 60 });
+  // Force-reset intervalSec on every install/update — old versions let users set
+  // sub-second values that caused the offscreen timer to spam /posts.
+  await chrome.storage.local.set({ intervalSec: 60 });
   await ensureOffscreen();
 });
 
@@ -65,9 +67,7 @@ chrome.runtime.onConnect.addListener((port) => {
   if (port.name === "keepalive") {
     console.log("[TruthAlert] Offscreen connected");
 
-    chrome.storage.local.get("intervalSec").then(({ intervalSec }) => {
-      port.postMessage({ type: "startTimer", seconds: intervalSec || 10 });
-    });
+    port.postMessage({ type: "startTimer", seconds: 60 });
 
     port.onMessage.addListener((msg) => {
       if (msg.type === "tick") {
