@@ -11,7 +11,7 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   if (data.enabled === undefined) await chrome.storage.local.set({ enabled: true });
   // Force-reset intervalSec on every install/update — old versions let users set
   // sub-second values that caused the offscreen timer to spam /posts.
-  await chrome.storage.local.set({ intervalSec: 60 });
+  await chrome.storage.local.set({ intervalSec: 30 });
   await ensureOffscreen();
 });
 
@@ -67,7 +67,7 @@ chrome.runtime.onConnect.addListener((port) => {
   if (port.name === "keepalive") {
     console.log("[TruthAlert] Offscreen connected");
 
-    port.postMessage({ type: "startTimer", seconds: 60 });
+    port.postMessage({ type: "startTimer", seconds: 30 });
 
     port.onMessage.addListener((msg) => {
       if (msg.type === "tick") {
