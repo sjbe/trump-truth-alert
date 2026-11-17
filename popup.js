@@ -330,68 +330,6 @@ function isSafeUrl(url) {
   }
 }
 
-// ── Email signup ─────────────────────────────────────────────────────────────
-
-const SERVER = "https://trump-truth-server-production.up.railway.app";
-
-async function initEmailSignup() {
-  const { emailSubscribed, emailDismissed } = await chrome.storage.local.get(["emailSubscribed", "emailDismissed"]);
-  if (emailSubscribed || emailDismissed) {
-    document.getElementById("emailSignup").style.display = "none";
-    return;
-  }
-
-  const input = document.getElementById("emailInput");
-  const btn = document.getElementById("emailSubmit");
-  const msg = document.getElementById("emailMsg");
-
-  document.getElementById("emailDismiss").addEventListener("click", async () => {
-    await chrome.storage.local.set({ emailDismissed: true });
-    document.getElementById("emailSignup").style.display = "none";
-  });
-
-  btn.addEventListener("click", async () => {
-    const email = input.value.trim();
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      msg.textContent = "Please enter a valid email address.";
-      msg.className = "email-msg error";
-      return;
-    }
-
-    btn.disabled = true;
-    btn.textContent = "Subscribing…";
-    msg.className = "email-msg";
-
-    try {
-      const res = await fetch(`${SERVER}/subscribe`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-TTA-Client": "ext" },
-        body: JSON.stringify({ email, source: "extension" }),
-      });
-      const data = await res.json();
-      if (res.ok && data.status === "ok") {
-        await chrome.storage.local.set({ emailSubscribed: true });
-        msg.textContent = "You're subscribed! Check your inbox for a welcome email.";
-        msg.className = "email-msg success";
-        input.style.display = "none";
-        btn.style.display = "none";
-      } else {
-        throw new Error(data.error || `Server error ${res.status}`);
-      }
-    } catch (err) {
-      msg.textContent = "Signup failed — please try again.";
-      msg.className = "email-msg error";
-      btn.disabled = false;
-      btn.textContent = "Subscribe";
-      console.error("[TruthAlert] subscribe error:", err);
-    }
-  });
-
-  input.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") btn.click();
-  });
-}
-
 // ── Filter pills ─────────────────────────────────────────────────────────────
 
 document.getElementById("filterBar").addEventListener("click", (e) => {
@@ -428,4 +366,3 @@ document.getElementById("filterBar").addEventListener("click", (e) => {
 
 // ── Go ──────────────────────────────────────────────────────────────────────
 init();
-initEmailSignup();

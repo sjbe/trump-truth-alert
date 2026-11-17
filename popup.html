@@ -379,76 +379,6 @@
       font-size: 13px;
     }
 
-    /* Email signup */
-    .email-signup {
-      padding: 10px 16px;
-      border-bottom: 1px solid #1e1e1e;
-      background: #161616;
-    }
-    .email-signup-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 7px;
-    }
-    .email-signup-label {
-      font-size: 10px;
-      font-weight: 700;
-      color: #888;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-    }
-    .email-dismiss {
-      background: none;
-      border: none;
-      color: #444;
-      font-size: 14px;
-      line-height: 1;
-      cursor: pointer;
-      padding: 0 2px;
-      transition: color 0.15s;
-    }
-    .email-dismiss:hover { color: #888; }
-    .email-row {
-      display: flex;
-      gap: 6px;
-    }
-    .email-input {
-      flex: 1;
-      background: #222;
-      border: 1px solid #333;
-      border-radius: 4px;
-      color: #e8e8e8;
-      font-size: 12px;
-      padding: 6px 9px;
-      outline: none;
-      transition: border-color 0.2s;
-    }
-    .email-input:focus { border-color: #e63535; }
-    .email-input::placeholder { color: #555; }
-    .email-submit {
-      background: #e63535;
-      color: #fff;
-      border: none;
-      border-radius: 4px;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.05em;
-      padding: 6px 12px;
-      cursor: pointer;
-      white-space: nowrap;
-      transition: opacity 0.15s;
-    }
-    .email-submit:hover { opacity: 0.85; }
-    .email-submit:disabled { opacity: 0.5; cursor: default; }
-    .email-msg {
-      font-size: 11px;
-      margin-top: 6px;
-      display: none;
-    }
-    .email-msg.success { color: #4ade80; display: block; }
-    .email-msg.error { color: #f87171; display: block; }
-
     /* Footer */
     .footer {
       padding: 10px 16px;
@@ -483,18 +413,6 @@
     <button class="filter-pill filter-pill--image" data-type="image">📷 IMAGE</button>
     <button class="filter-pill filter-pill--video" data-type="video">🎬 VIDEO</button>
     <button class="filter-pill filter-pill--retruth" data-type="retruth">🔁 RETRUTH</button>
-  </div>
-
-  <div class="email-signup" id="emailSignup">
-    <div class="email-signup-header">
-      <div class="email-signup-label">📧 Email Alerts</div>
-      <button class="email-dismiss" id="emailDismiss" title="Dismiss">✕</button>
-    </div>
-    <div class="email-row">
-      <input class="email-input" type="email" id="emailInput" placeholder="your@email.com">
-      <button class="email-submit" id="emailSubmit">Subscribe</button>
-    </div>
-    <div class="email-msg" id="emailMsg"></div>
   </div>
 
   <div class="section-title">Recent Truths</div>
